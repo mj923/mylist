@@ -1,0 +1,257 @@
+{
+  "policy": {
+    "system": {
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  },
+  "log": {
+    "access": "",
+    "error": "",
+    "loglevel": "warning"
+  },
+//入站规则
+  "inbounds": [
+    {
+      "tag": "socks",
+      "port": 10808,
+      "listen": "127.0.0.1",
+      "protocol": "socks",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "allowTransparent": false
+      }
+    },
+    {
+      "tag": "http",
+      "port": 10809,
+      "listen": "127.0.0.1",
+      "protocol": "http",
+      "sniffing": {
+        "enabled": true,
+        "destOverride": [
+          "http",
+          "tls"
+        ]
+      },
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "allowTransparent": false
+      }
+    },
+    {
+      "tag": "api",
+      "port": 53284,
+      "listen": "127.0.0.1",
+      "protocol": "dokodemo-door",
+      "settings": {
+        "udp": false,
+        "address": "127.0.0.1",
+        "allowTransparent": false
+      }
+    }
+  ],
+  //出站规则
+  "outbounds": [
+    {//小鸡KR001节点的配置
+      "tag": "KR001",				//需要给节点配置tag,名称任意
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "kr001.3ptour.xyz",
+            "port": 2023,
+            "users": [
+              {
+                "id": "a64ba6ad-f62e-4d22-a2f1-dcc6fd13f2dd",
+                "alterId": 0,
+                "email": "t@t.tt",
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/tour"
+        }
+      },
+      "mux": {
+        "enabled": false,
+        "concurrency": -1
+      }
+    },
+    {//小鸡KR节点的配置
+      "tag": "KR",				//需要给节点配置tag,名称任意
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "kr.3ptour.xyz",
+            "port": 2023,
+            "users": [
+              {
+                "id": "97a2a6ca-3094-40b0-caa4-0fadc38ce90c",
+                "alterId": 0,
+                "email": "t@t.tt",
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/"
+        }
+      },
+      "mux": {
+        "enabled": false,
+        "concurrency": -1
+      }
+    },
+    {
+      "tag": "JD",
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "jd.3ptour.xyz",
+            "port": 2022,
+            "users": [
+              {
+                "id": "e21848ec-c912-4105-ec7f-b967e47f4f73",
+                "alterId": 0,
+                "email": "t@t.tt",
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "allowInsecure": true
+        },
+        "wsSettings": {
+          "path": "/"
+        }
+      },
+      "mux": {
+        "enabled": false,
+        "concurrency": -1
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole",
+      "settings": {
+        "response": {
+          "type": "http"
+        }
+      }
+    }
+  ],
+ //探针,每隔10分钟测试一次数组中节点的连接速度,负载均衡策略对象为leastPing会调用。
+  "observatory": {
+	"subjectSelector":[
+        "KR001",
+        "KR",
+		    "JD"
+	],
+	"probeInterval":"10m"
+  },
+  "stats": {},
+  "api": {
+    "tag": "api",
+    "services": [
+      "StatsService"
+    ]
+  },
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+	"balancers": [//负载均衡策略
+      {
+        "tag": "balancer",
+        "selector": [//一个字符串数组，其中每一个字符串将用于和出站协议标识的前缀匹配。
+          "KR001",
+          "KR",
+		      "JD"
+        ],
+		"strategy": {//负载均衡策略对象
+		  //type可填 random 或 leastPing ;random 会从出站中随机选出一个作为最终的出站连接;
+		  //leastPing 会根据观测记录选择 HTTPS GET 请求完成时间最快的一个出站连接。
+		  "type": "random"		
+		}
+      }
+    ],
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": [
+          "api"
+        ],
+        "outboundTag": "api",
+        "enabled": true
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "domain": [
+          "domain:example-example.com",
+          "domain:example-example2.com"
+        ],
+        "enabled": true
+      },
+      {
+        "type": "field",
+        "outboundTag": "block",
+        "domain": [
+          "geosite:category-ads-all"
+        ],
+        "enabled": true
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "domain": [
+          "geosite:cn"
+        ],
+        "enabled": true
+      },
+      {
+        "type": "field",
+        "outboundTag": "direct",
+        "ip": [
+          "geoip:private",
+          "geoip:cn"
+        ],
+        "enabled": true
+      },
+      {//将流量转发给负载均衡策略
+        "type": "field",
+        "network": "tcp,udp",
+        "balancerTag": "balancer"
+      }
+    ]
+  }
+}
